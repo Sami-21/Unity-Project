@@ -11,11 +11,12 @@ public class ThirdPersonMovement : MonoBehaviour
     public Transform player;
     public Transform playerObj;
     public Transform Cam;
-    public InputAction playerControls;
+    public PlayerInput playerControls;
     public float velocity;
     private float smoothTurnTime = 5f;
+    private float actionsCooldown;
+
     Vector3 direction = Vector3.zero;
-    KeyCode block;
 
 
 
@@ -33,11 +34,11 @@ public class ThirdPersonMovement : MonoBehaviour
         //Forward Run
         if (direction.z > 0 && !isRunningForward)
         {
-            animator.SetBool("isRunningForward",true);
+            animator.SetBool("isRunningForward", true);
         }
-        if(direction.z == 0 && isRunningForward)
+        if (direction.z == 0 && isRunningForward)
         {
-            animator.SetBool("isRunningForward",false);
+            animator.SetBool("isRunningForward", false);
         }
         //Backward Run
         if (direction.z < 0 && !isRunningBackward)
@@ -80,7 +81,7 @@ public class ThirdPersonMovement : MonoBehaviour
         {
             animator.SetBool("isRunningRight", true);
         }
-        if ((direction.x == 0 || direction.z == 0 ) && isRunningRight)
+        if ((direction.x == 0 || direction.z == 0) && isRunningRight)
         {
             animator.SetBool("isRunningRight", false);
         }
@@ -105,7 +106,7 @@ public class ThirdPersonMovement : MonoBehaviour
 
     }
 
-    void PlayerMove(Vector3 movement , float speed)
+    private void PlayerMove(Vector3 movement, float speed)
     {
         if (speed > 0.1f)
         {
@@ -116,17 +117,75 @@ public class ThirdPersonMovement : MonoBehaviour
 
         }
     }
+    private void PunchLeft(InputAction.CallbackContext context)
+    {
+        bool isPunchingLeft = context.ReadValueAsButton();
+        if (actionsCooldown < Time.time && isPunchingLeft)
+        {
+            animator.Play("PunchLeft", 1, 0);
+            animator.SetLayerWeight(1, 1);
+            float animationDuration = animator.GetCurrentAnimatorStateInfo(1).length;
+            actionsCooldown = Time.time + animationDuration;
+            Invoke("LeftPunchLayerReset", animationDuration);
+        }
+    }
+    private void LeftPunchLayerReset()
+    {
+        animator.SetLayerWeight(1, 0);
+    }
+    private void PunchRight(InputAction.CallbackContext context)
+    {
+        bool isPunchingRight = context.ReadValueAsButton();
+        if (actionsCooldown < Time.time && isPunchingRight)
+        {
+            animator.Play("PunchRight", 2, 0);
+            animator.SetLayerWeight(2, 1);
+            float animationDuration = animator.GetCurrentAnimatorStateInfo(1).length;
+            actionsCooldown = Time.time + animationDuration;
+            Invoke("RightPunchLayerReset", animationDuration);
+        }
+    }
+    private void RightPunchLayerReset()
+    {
+        animator.SetLayerWeight(2, 0);
+    }
+    private void Block(InputAction.CallbackContext context)
+    {
+        bool isBlocking = context.ReadValueAsButton();
+        if (isBlocking)
+        {
+            animator.Play("Block", 3, 0);
+            animator.SetLayerWeight(3, 1);
+        }
+        else
+        {
+            animator.SetLayerWeight(3, 0);
+        }
+    }
     private void Awake()
     {
-        animator = GetComponent < Animator >();
+        animator = GetComponent<Animator>();
+        playerControls = new PlayerInput();
+
+        playerControls.Player.punchleft.started += PunchLeft;
+        playerControls.Player.punchleft.performed += PunchLeft;
+        playerControls.Player.punchleft.canceled += PunchLeft;
+
+        playerControls.Player.punchright.started += PunchRight;
+        playerControls.Player.punchright.performed += PunchRight;
+        playerControls.Player.punchright.canceled += PunchRight;
+
+        playerControls.Player.block.started += Block;
+        playerControls.Player.block.performed += Block;
+        playerControls.Player.block.canceled += Block;
     }
     private void OnEnable()
     {
-        playerControls.Enable();
+        playerControls.Player.Enable();
     }
     private void OnDisable()
     {
-        playerControls.Disable();
+        playerControls.Player.Disable();
     }
     private void Start()
     {
@@ -140,9 +199,9 @@ public class ThirdPersonMovement : MonoBehaviour
         orientation.forward = viewDirection.normalized;
 
         // Reading player input
-        direction = playerControls.ReadValue<Vector3>();
+        direction = playerControls.Player.move.ReadValue<Vector3>();
 
-        Vector3 movement = orientation.right * direction.x  + orientation.forward * direction.z;
+        Vector3 movement = orientation.right * direction.x + orientation.forward * direction.z;
 
         // Player rotaion when moving ( player always facing the view direction when moving )
         Vector3 inputDir = orientation.forward * Mathf.Abs(direction.z) + orientation.forward * Mathf.Abs(direction.x);
